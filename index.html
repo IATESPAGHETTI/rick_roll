@@ -33,6 +33,19 @@
             color: #fff;
             font-size: 1.2rem;
         }
+        #startBtn {
+            position: absolute;
+            bottom: 40px; left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            background: #0f0;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
@@ -40,7 +53,8 @@
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
     <div id="msg"></div>
-    <div id="loading">Loading camera and AI...</div>
+    <div id="loading">Click Start to begin</div>
+    <button id="startBtn">Start Detection</button>
 </div>
 <script>
 const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
@@ -49,6 +63,7 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const msg = document.getElementById('msg');
 const loading = document.getElementById('loading');
+const startBtn = document.getElementById('startBtn');
 let rickrolled = false;
 let lastDetect = 0;
 
@@ -57,10 +72,10 @@ function isMiddleFinger(landmarks) {
     function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
     function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
     return (
-        up(12,10) && // middle finger up
-        down(8,6) && // index down
-        down(16,14) && // ring down
-        down(20,18) // pinky down
+        up(12,10) &&
+        down(8,6) &&
+        down(16,14) &&
+        down(20,18)
     );
 }
 
@@ -95,7 +110,6 @@ function onResults(results) {
     }
     ctx.restore();
 
-    // Rickroll logic with cooldown
     if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
         msg.textContent = "Middle finger detected! 😏";
         rickrolled = true;
@@ -107,10 +121,9 @@ function onResults(results) {
     }
 }
 
-// Camera setup (using MediaPipe CameraUtils)
 async function setupCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, // No width/height constraints!
+        video: { facingMode: 'user' },
         audio: false
     });
     video.srcObject = stream;
@@ -120,6 +133,7 @@ async function setupCamera() {
         canvas.height = video.videoHeight;
     };
     loading.style.display = 'none';
+    startBtn.style.display = 'none';
     const camera = new Camera(video, {
         onFrame: async () => {
             await hands.send({image: video});
@@ -128,7 +142,10 @@ async function setupCamera() {
     camera.start();
 }
 
-setupCamera();
+// Wait for user interaction
+startBtn.addEventListener('click', () => {
+    setupCamera();
+});
 </script>
 </body>
 </html>
