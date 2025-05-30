@@ -15,7 +15,7 @@
             width: 100vw;
             height: 100vh;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror for selfie */
+            transform: scaleX(-1);
         }
         #msg {
             position: absolute;
@@ -33,14 +33,28 @@
             color: #fff;
             font-size: 1.2rem;
         }
+        #startBtn {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 1em 2em;
+            font-size: 1.5em;
+            background: #0ff;
+            color: #111;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
 <div id="container">
-    <video id="video" autoplay playsinline muted></video>
+    <button id="startBtn">Start Detection</button>
+    <video id="video" autoplay playsinline muted style="display:none"></video>
     <canvas id="canvas"></canvas>
     <div id="msg"></div>
-    <div id="loading">Loading camera and AI...</div>
+    <div id="loading" style="display:none">Loading camera and AI...</div>
 </div>
 <script>
 const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
@@ -49,19 +63,19 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const msg = document.getElementById('msg');
 const loading = document.getElementById('loading');
+const startBtn = document.getElementById('startBtn');
 let rickrolled = false;
 let lastDetect = 0;
 
 // Helper: Check for middle finger up, others down
 function isMiddleFinger(landmarks) {
-    // y: top=0, bottom=1
     function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
     function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
     return (
         up(12,10) && // middle finger up
         down(8,6) && // index down
         down(16,14) && // ring down
-        down(20,18) // pinky down
+        down(20,18)    // pinky down
     );
 }
 
@@ -110,30 +124,32 @@ function onResults(results) {
 
 // Camera setup (using MediaPipe CameraUtils)
 async function setupCamera() {
+    loading.style.display = 'block';
     const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: {ideal: 640}, height: {ideal: 480} },
+        video: { facingMode: 'user' },
         audio: false
     });
     video.srcObject = stream;
     await video.play();
-    // Set canvas size to video size
+    video.style.display = '';
     video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        loading.style.display = 'none';
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            }
+        });
+        camera.start();
     };
-    loading.style.display = 'none';
-    // Use MediaPipe Camera helper for smooth frame delivery
-    const camera = new Camera(video, {
-        onFrame: async () => {
-            await hands.send({image: video});
-        },
-        width: 640,
-        height: 480
-    });
-    camera.start();
 }
 
-setupCamera();
+// Only start detection after user clicks the button
+startBtn.onclick = function() {
+    startBtn.style.display = 'none';
+    setupCamera();
+};
 </script>
 </body>
 </html>
