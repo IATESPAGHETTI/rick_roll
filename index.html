@@ -33,29 +33,32 @@
             color: #fff;
             font-size: 1.2rem;
         }
-        #startBtn {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 1em 2em;
-            font-size: 1.5em;
-            background: #0ff;
-            color: #111;
-            border: none;
-            border-radius: 10px;
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0ff;
+            font-size: 2rem;
+            z-index: 999;
             cursor: pointer;
-            z-index: 10;
+            text-align: center;
+            padding: 2rem;
         }
     </style>
 </head>
 <body>
 <div id="container">
-    <button id="startBtn">Start Detection</button>
+    <div id="overlay" onclick="startDetection()">👋 Tap anywhere to start detection</div>
     <video id="video" autoplay playsinline muted style="display:none"></video>
     <canvas id="canvas"></canvas>
     <div id="msg"></div>
     <div id="loading" style="display:none">Loading camera and AI...</div>
 </div>
+
 <script>
 const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
 const video = document.getElementById('video');
@@ -63,7 +66,6 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const msg = document.getElementById('msg');
 const loading = document.getElementById('loading');
-const startBtn = document.getElementById('startBtn');
 let rickrolled = false;
 let lastDetect = 0;
 
@@ -72,7 +74,7 @@ function isMiddleFinger(landmarks) {
     function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
     function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
     return (
-        up(12,10) && // middle finger up
+        up(12,10) && // middle up
         down(8,6) && // index down
         down(16,14) && // ring down
         down(20,18)    // pinky down
@@ -110,7 +112,6 @@ function onResults(results) {
     }
     ctx.restore();
 
-    // Rickroll logic with cooldown
     if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
         msg.textContent = "Middle finger detected! 😏";
         rickrolled = true;
@@ -122,7 +123,7 @@ function onResults(results) {
     }
 }
 
-// Camera setup (using MediaPipe CameraUtils)
+// Setup Camera
 async function setupCamera() {
     loading.style.display = 'block';
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -145,11 +146,167 @@ async function setupCamera() {
     };
 }
 
-// Only start detection after user clicks the button
-startBtn.onclick = function() {
-    startBtn.style.display = 'none';
+// Triggered on first click
+function startDetection() {
+    document.getElementById('overlay').style.display = 'none';
     setupCamera();
-};
+}
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hand Gesture Rickroll</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <style>
+        body { margin: 0; background: #111; color: #eee; font-family: sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        #video, #canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        #msg {
+            position: absolute;
+            top: 10px; left: 0; width: 100vw;
+            text-align: center;
+            font-size: 2rem;
+            color: #ff4444;
+            text-shadow: 2px 2px 8px #000;
+            pointer-events: none;
+        }
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 1.2rem;
+        }
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0ff;
+            font-size: 2rem;
+            z-index: 999;
+            cursor: pointer;
+            text-align: center;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="overlay" onclick="startDetection()">👋 Tap anywhere to start detection</div>
+    <video id="video" autoplay playsinline muted style="display:none"></video>
+    <canvas id="canvas"></canvas>
+    <div id="msg"></div>
+    <div id="loading" style="display:none">Loading camera and AI...</div>
+</div>
+
+<script>
+const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const msg = document.getElementById('msg');
+const loading = document.getElementById('loading');
+let rickrolled = false;
+let lastDetect = 0;
+
+// Helper: Check for middle finger up, others down
+function isMiddleFinger(landmarks) {
+    function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
+    function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
+    return (
+        up(12,10) && // middle up
+        down(8,6) && // index down
+        down(16,14) && // ring down
+        down(20,18)    // pinky down
+    );
+}
+
+// Setup MediaPipe Hands
+const hands = new Hands({
+    locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+    selfieMode: true,
+    maxNumHands: 1,
+    modelComplexity: 0,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.7
+});
+hands.onResults(onResults);
+
+function onResults(results) {
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    let detected = false;
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
+        for (const landmarks of results.multiHandLandmarks) {
+            drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#0ff', lineWidth: 3});
+            drawLandmarks(ctx, landmarks, {color: '#fff', lineWidth: 2});
+            if (isMiddleFinger(landmarks)) {
+                detected = true;
+            }
+        }
+    }
+    ctx.restore();
+
+    if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
+        msg.textContent = "Middle finger detected! 😏";
+        rickrolled = true;
+        lastDetect = Date.now();
+        setTimeout(() => { window.open(YOUTUBE_URL, '_blank'); }, 500);
+        setTimeout(() => { rickrolled = false; msg.textContent = ""; }, 5000);
+    } else if (!detected) {
+        msg.textContent = "";
+    }
+}
+
+// Setup Camera
+async function setupCamera() {
+    loading.style.display = 'block';
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    video.style.display = '';
+    video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        loading.style.display = 'none';
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            }
+        });
+        camera.start();
+    };
+}
+
+// Triggered on first click
+function startDetection() {
+    document.getElementById('overlay').style.display = 'none';
+    setupCamera();
+}
 </script>
 </body>
 </html>
