@@ -16,6 +16,7 @@
             height: 100vh;
             object-fit: cover;
             transform: scaleX(-1);
+            display: none;
         }
         #msg {
             position: absolute;
@@ -32,29 +33,31 @@
             transform: translate(-50%, -50%);
             color: #fff;
             font-size: 1.2rem;
+            display: none;
         }
         #startBtn {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            padding: 1em 2em;
-            font-size: 1.5em;
+            padding: 1.2em 2.5em;
+            font-size: 2em;
             background: #0ff;
             color: #111;
             border: none;
-            border-radius: 10px;
+            border-radius: 15px;
             cursor: pointer;
             z-index: 10;
+            box-shadow: 0 4px 20px #0008;
         }
     </style>
 </head>
 <body>
 <div id="container">
-    <button id="startBtn">Start Detection</button>
-    <video id="video" autoplay playsinline muted style="display:none"></video>
+    <button id="startBtn">Start</button>
+    <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
     <div id="msg"></div>
-    <div id="loading" style="display:none">Loading camera and AI...</div>
+    <div id="loading">Loading camera and AI...</div>
 </div>
 <script>
 const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
@@ -67,7 +70,6 @@ const startBtn = document.getElementById('startBtn');
 let rickrolled = false;
 let lastDetect = 0;
 
-// Helper: Check for middle finger up, others down
 function isMiddleFinger(landmarks) {
     function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
     function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
@@ -79,7 +81,6 @@ function isMiddleFinger(landmarks) {
     );
 }
 
-// Setup MediaPipe Hands
 const hands = new Hands({
     locateFile: (file) =>
         `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -110,7 +111,6 @@ function onResults(results) {
     }
     ctx.restore();
 
-    // Rickroll logic with cooldown
     if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
         msg.textContent = "Middle finger detected! 😏";
         rickrolled = true;
@@ -122,7 +122,6 @@ function onResults(results) {
     }
 }
 
-// Camera setup (using MediaPipe CameraUtils)
 async function setupCamera() {
     loading.style.display = 'block';
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -136,6 +135,7 @@ async function setupCamera() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         loading.style.display = 'none';
+        canvas.style.display = '';
         const camera = new Camera(video, {
             onFrame: async () => {
                 await hands.send({image: video});
@@ -145,9 +145,10 @@ async function setupCamera() {
     };
 }
 
-// Only start detection after user clicks the button
 startBtn.onclick = function() {
     startBtn.style.display = 'none';
+    video.style.display = '';
+    canvas.style.display = '';
     setupCamera();
 };
 </script>
