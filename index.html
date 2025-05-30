@@ -33,22 +33,6 @@
             color: #fff;
             font-size: 1.2rem;
         }
-        #startBtn {
-            position: absolute;
-            bottom: 40px; left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            font-size: 1.1rem;
-            background: #0f0;
-            color: #000;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            z-index: 2;
-        }
-        #rickLink {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -56,20 +40,15 @@
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
     <div id="msg"></div>
-    <div id="loading">Click Start to begin</div>
-    <button id="startBtn">Start Detection</button>
-    <a id="rickLink" href="https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti" target="_blank">Rick</a>
+    <div id="loading">Loading camera and AI...</div>
 </div>
 <script>
+const RICKROLL_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const msg = document.getElementById('msg');
 const loading = document.getElementById('loading');
-const startBtn = document.getElementById('startBtn');
-const rickLink = document.getElementById('rickLink');
-
-let rickrollReady = false;
 let rickrolled = false;
 let lastDetect = 0;
 
@@ -78,16 +57,17 @@ function isMiddleFinger(landmarks) {
     function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
     function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
     return (
-        up(12,10) && // middle up
+        up(12,10) && // middle finger up
         down(8,6) && // index down
         down(16,14) && // ring down
         down(20,18) // pinky down
     );
 }
 
-// Setup MediaPipe
+// Setup MediaPipe Hands
 const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 hands.setOptions({
     selfieMode: true,
@@ -115,16 +95,20 @@ function onResults(results) {
     }
     ctx.restore();
 
-    if (detected && !rickrolled && Date.now() - lastDetect > 1000) {
+    // Rickroll logic with cooldown
+    if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
         msg.textContent = "Middle finger detected! 😏";
+        rickrolled = true;
         lastDetect = Date.now();
-        rickrollReady = true; // Set flag to Rickroll on next real user click
+        setTimeout(() => {
+            window.location.href = RICKROLL_URL;
+        }, 800);
     } else if (!detected) {
         msg.textContent = "";
-        rickrollReady = false;
     }
 }
 
+// Camera setup (using MediaPipe CameraUtils)
 async function setupCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
@@ -137,8 +121,6 @@ async function setupCamera() {
         canvas.height = video.videoHeight;
     };
     loading.style.display = 'none';
-    startBtn.style.display = 'none';
-
     const camera = new Camera(video, {
         onFrame: async () => {
             await hands.send({image: video});
@@ -147,18 +129,7 @@ async function setupCamera() {
     camera.start();
 }
 
-// 👇 Bind click once to bypass popup block
-startBtn.addEventListener('click', () => {
-    setupCamera();
-    document.body.addEventListener('click', () => {
-        if (rickrollReady && !rickrolled) {
-            rickrolled = true;
-            rickLink.click(); // Simulates user click
-            msg.textContent = '';
-            setTimeout(() => rickrolled = false, 5000);
-        }
-    });
-}, { once: true });
+setupCamera();
 </script>
 </body>
 </html>
