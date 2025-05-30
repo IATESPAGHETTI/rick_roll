@@ -1,156 +1,131 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hand Gesture Rickroll</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <title>Instant Rickroll</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <style>
-        body { margin: 0; background: #111; color: #eee; font-family: sans-serif; }
-        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-        #video, #canvas {
-            position: absolute;
-            top: 0; left: 0;
+        body { margin: 0; overflow: hidden; }
+        #container { 
+            position: relative;
             width: 100vw;
             height: 100vh;
+        }
+        #video, #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
         }
-        #msg {
-            position: absolute;
-            top: 10px; left: 0; width: 100vw;
-            text-align: center;
-            font-size: 2rem;
-            color: #ff4444;
-            text-shadow: 2px 2px 8px #000;
-            pointer-events: none;
-        }
         #loading {
-            position: absolute;
-            top: 50%; left: 50%;
+            position: fixed;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
-            color: #fff;
-            font-size: 1.2rem;
-        }
-        #interactionOverlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.8);
-            color: #0ff;
-            font-size: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 20;
-            cursor: pointer;
-            text-align: center;
-            padding: 2rem;
+            color: white;
+            font-family: Arial;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
-<div id="container">
-    <div id="interactionOverlay">Tap to Start</div>
-    <video id="video" autoplay playsinline muted style="display:none"></video>
-    <canvas id="canvas"></canvas>
-    <div id="msg"></div>
-    <div id="loading" style="display:none">Loading camera and AI...</div>
-</div>
+    <div id="container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        <div id="loading">Initializing camera...</div>
+    </div>
+
 <script>
-const YOUTUBE_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
+// Configuration
+const VIDEO_WIDTH = 640;
+const VIDEO_HEIGHT = 360;
+const RICKROLL_URL = 'https://youtu.be/xvFZjo5PgG0?si=KP-pJS8GLMLf_uti';
+let lastDetection = 0;
+let isRickrolled = false;
+
+// Elements
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const msg = document.getElementById('msg');
 const loading = document.getElementById('loading');
-const interactionOverlay = document.getElementById('interactionOverlay');
-let rickrolled = false;
-let lastDetect = 0;
 
-// Helper: Check for middle finger up, others down
-function isMiddleFinger(landmarks) {
-    function up(tip, pip) { return landmarks[tip].y < landmarks[pip].y; }
-    function down(tip, pip) { return landmarks[tip].y > landmarks[pip].y; }
-    return (
-        up(12,10) && // middle finger up
-        down(8,6) && // index down
-        down(16,14) && // ring down
-        down(20,18)    // pinky down
-    );
-}
-
-// Setup MediaPipe Hands
+// MediaPipe Hands setup
 const hands = new Hands({
-    locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
+
 hands.setOptions({
     selfieMode: true,
     maxNumHands: 1,
-    modelComplexity: 0,
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence: 0.7
+    modelComplexity: 0,  // Faster processing
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
 });
-hands.onResults(onResults);
 
-function onResults(results) {
-    ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+// Optimized middle finger check
+function isMiddleFinger(landmarks) {
+    const required = {
+        8: 6,   // Index
+        12: 10, // Middle
+        16: 14, // Ring
+        20: 18  // Pinky
+    };
 
-    let detected = false;
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
-        for (const landmarks of results.multiHandLandmarks) {
-            drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#0ff', lineWidth: 3});
-            drawLandmarks(ctx, landmarks, {color: '#fff', lineWidth: 2});
-            if (isMiddleFinger(landmarks)) {
-                detected = true;
-            }
+    return Object.entries(required).every(([tip, dip]) => 
+        landmarks[tip].y < landmarks[dip].y
+    ) && landmarks[12].y < landmarks[10].y;
+}
+
+// Throttled detection
+async function processFrame() {
+    if (!video.videoWidth) return;
+    
+    ctx.drawImage(video, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+    const image = await hands.send({ image: canvas });
+    
+    if (image.multiHandLandmarks && !isRickrolled) {
+        const now = Date.now();
+        if (now - lastDetection > 1000) { // 1 second cooldown
+            isRickrolled = true;
+            window.open(RICKROLL_URL, '_blank');
+            lastDetection = now;
+            setTimeout(() => isRickrolled = false, 5000);
         }
     }
-    ctx.restore();
-
-    if (detected && !rickrolled && Date.now() - lastDetect > 2000) {
-        msg.textContent = "Middle finger detected! 😏";
-        rickrolled = true;
-        lastDetect = Date.now();
-        setTimeout(() => { window.open(YOUTUBE_URL, '_blank'); }, 500);
-        setTimeout(() => { rickrolled = false; msg.textContent = ""; }, 5000);
-    } else if (!detected) {
-        msg.textContent = "";
-    }
+    
+    requestAnimationFrame(processFrame);
 }
 
 // Camera setup
-async function setupCamera() {
-    loading.style.display = 'block';
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false
-    });
-    video.srcObject = stream;
-    await video.play();
-    video.style.display = '';
-    video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        loading.style.display = 'none';
-        const camera = new Camera(video, {
-            onFrame: async () => {
-                await hands.send({image: video});
+async function initCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: VIDEO_WIDTH },
+                height: { ideal: VIDEO_HEIGHT },
+                frameRate: { ideal: 30 }
             }
         });
-        camera.start();
-    };
+        
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            canvas.width = VIDEO_WIDTH;
+            canvas.height = VIDEO_HEIGHT;
+            loading.style.display = 'none';
+            processFrame();
+        };
+    } catch (error) {
+        loading.textContent = 'Camera access denied!';
+    }
 }
 
-// Start detection on user interaction
-interactionOverlay.onclick = function() {
-    interactionOverlay.style.display = 'none';
-    setupCamera();
-};
+// Start everything
+hands.initialize().then(initCamera);
 </script>
 </body>
 </html>
